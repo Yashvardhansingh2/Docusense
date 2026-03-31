@@ -1,0 +1,210 @@
+# Docusense
+
+RAG-powered document intelligence API for PDFs.
+
+Docusense lets you upload a document, index it into semantic chunks, and ask grounded questions with cited sources using Gemini + pgvector.
+
+## Why Docusense
+
+Most document QnA demos stop at toy examples. Docusense is built as a practical backend service with:
+
+- PDF ingestion and chunking
+- vector search with pgvector
+- grounded answer generation using Gemini
+- Redis caching for repeated queries
+- query logging for observability
+- production-ready FastAPI endpoints
+
+## Architecture
+
+```mermaid
+flowchart LR
+    A[Client] --> B[FastAPI API]
+    B --> C[Ingestion Service]
+    C --> D[(PostgreSQL + pgvector)]
+    B --> E[Retriever]
+    E --> D
+    B --> F[LLM Service\nGemini]
+    B --> G[(Upstash Redis Cache)]
+    B --> H[(Supabase Storage optional)]
+```
+
+## Tech Stack
+
+- Python 3.11
+- FastAPI + Uvicorn
+- PostgreSQL + pgvector
+- SQLAlchemy async + asyncpg
+- LangChain + Google Gemini
+- Upstash Redis
+- Supabase (DB/Storage)
+- Docker Compose
+
+## Project Layout
+
+```text
+docusense/
+  backend/
+    app/
+      api/routes.py
+      core/config.py
+      core/database.py
+      services/
+  docker-compose.yml
+  supabase_setup.sql
+```
+
+## Features
+
+- `POST /api/v1/documents/upload`
+  Upload and index a PDF into chunks and embeddings.
+- `POST /api/v1/query`
+  Ask a question against one uploaded document.
+- `POST /api/v1/chunks/test`
+  Inspect retrieval quality without calling the LLM.
+- `GET /api/v1/documents`
+  List recent documents.
+- `DELETE /api/v1/documents/{doc_id}`
+  Delete a document.
+- `GET /api/v1/health`
+  Service health endpoint.
+
+## Prerequisites
+
+- Docker Desktop running
+- Google Gemini API key
+- Supabase project (recommended)
+- Upstash Redis credentials
+
+## Environment Setup
+
+Create `.env` in repo root:
+
+```env
+GEMINI_API_KEY=your_gemini_key
+
+DATABASE_URL=postgresql://postgres:your_password@db.yourref.supabase.co:5432/postgres
+SUPABASE_URL=https://yourref.supabase.co
+SUPABASE_SERVICE_KEY=your_supabase_service_role_key
+SUPABASE_BUCKET=docusense-files
+
+UPSTASH_REDIS_REST_URL=https://your-upstash-url.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your_upstash_token
+
+SECRET_KEY=replace_with_random_secret
+ENVIRONMENT=development
+```
+
+## Database Initialization
+
+Run SQL once in your target Postgres (usually Supabase SQL editor):
+
+```sql
+-- from supabase_setup.sql
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+```
+
+Then run full schema from [supabase_setup.sql](supabase_setup.sql).
+
+## Run Locally
+
+```bash
+docker compose up --build
+```
+
+API will be available at:
+
+- http://localhost:8000
+- Swagger UI: http://localhost:8000/docs
+
+## Quick API Test
+
+### 1) Health
+
+```bash
+curl http://localhost:8000/api/v1/health
+```
+
+### 2) Upload a PDF
+
+```bash
+curl -X POST http://localhost:8000/api/v1/documents/upload \
+  -F "file=@/Users/$(whoami)/Downloads/any_file.pdf"
+```
+
+Sample response:
+
+```json
+{
+  "doc_id": "f1f5...",
+  "filename": "any_file.pdf",
+  "chunks_created": 24,
+  "characters_extracted": 18230,
+  "status": "ready"
+}
+```
+
+### 3) Ask a question
+
+```bash
+curl -X POST http://localhost:8000/api/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"What is this document about?","doc_id":"DOC_ID_HERE"}'
+```
+
+### 4) Validate retrieval only (no LLM)
+
+```bash
+curl -X POST http://localhost:8000/api/v1/chunks/test \
+  -H "Content-Type: application/json" \
+  -d '{"doc_id":"DOC_ID_HERE","question":"Summarize key topics","top_k":5}'
+```
+
+## Docker Services
+
+Defined in [docker-compose.yml](docker-compose.yml):
+
+- `api` (FastAPI)
+- `localdb` (pgvector Postgres for local dev)
+- `localredis` (Redis for local dev)
+
+## Troubleshooting
+
+### `vector extension not found`
+
+Run `supabase_setup.sql` in your database and ensure pgvector is enabled.
+
+### `Invalid API key` for Gemini
+
+Check `GEMINI_API_KEY` and API quota in Google AI Studio.
+
+### Upload succeeds but query returns no chunks
+
+- document text extraction may be empty
+- check PDF is text-based (not scanned image-only)
+- test retrieval with `/api/v1/chunks/test`
+
+### Slow first query
+
+First query does retrieval + LLM generation. Repeated same question is cached in Redis.
+
+## Deployment (Render)
+
+Suggested Render Web Service settings:
+
+- Root Directory: `backend`
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+
+Set all env vars from `.env` in Render dashboard.
+
+## Security Notes
+
+- Never commit `.env`
+- Use Supabase `service_role` key only in backend
+- Rotate tokens if exposed
+
+## License
+
+Add an explicit license (MIT/Apache-2.0) before production/public reuse.
