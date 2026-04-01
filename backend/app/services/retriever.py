@@ -4,11 +4,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 
-embeddings_model = GoogleGenerativeAIEmbeddings(
-    model="models/gemini-embedding-001",
-    google_api_key=settings.gemini_api_key,
-    output_dimensionality=768,
-)
+_embeddings_model: GoogleGenerativeAIEmbeddings | None = None
+
+
+def _get_embeddings_model() -> GoogleGenerativeAIEmbeddings:
+    global _embeddings_model
+    if _embeddings_model is None:
+        _embeddings_model = GoogleGenerativeAIEmbeddings(
+            model="models/gemini-embedding-001",
+            google_api_key=settings.gemini_api_key,
+            output_dimensionality=768,
+        )
+    return _embeddings_model
 
 
 async def retrieve_chunks(
@@ -21,6 +28,7 @@ async def retrieve_chunks(
     Embed the question, then find the k most similar chunks
     from this document using pgvector cosine similarity.
     """
+    embeddings_model = _get_embeddings_model()
     query_embedding = await embeddings_model.aembed_query(question)
     query_embedding_768 = query_embedding[:768]
 
