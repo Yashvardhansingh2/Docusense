@@ -6,11 +6,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.core.config import settings
 
-llm = ChatGoogleGenerativeAI(
-    model="gemini-flash-lite-latest",
-    google_api_key=settings.gemini_api_key,
-    temperature=0.1,
-)
+_llm: ChatGoogleGenerativeAI | None = None
 
 prompt = ChatPromptTemplate.from_template("""
 You are a precise document assistant. Answer ONLY using the context below.
@@ -25,7 +21,16 @@ Question: {question}
 
 Answer:""")
 
-chain = prompt | llm | StrOutputParser()
+
+def _get_chain():
+    global _llm
+    if _llm is None:
+        _llm = ChatGoogleGenerativeAI(
+            model="gemini-flash-lite-latest",
+            google_api_key=settings.gemini_api_key,
+            temperature=0.1,
+        )
+    return prompt | _llm | StrOutputParser()
 
 
 async def generate_answer(question: str, chunks: list[dict]) -> dict:
@@ -33,6 +38,7 @@ async def generate_answer(question: str, chunks: list[dict]) -> dict:
         [f"[Section {c['chunk_index']}]\n{c['content']}" for c in chunks]
     )
     start = time.time()
+    chain = _get_chain()
     answer = await chain.ainvoke({"context": context, "question": question})
     elapsed_ms = int((time.time() - start) * 1000)
 

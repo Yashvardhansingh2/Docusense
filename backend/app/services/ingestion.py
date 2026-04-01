@@ -13,10 +13,18 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 # --- Embedding model (free Gemini tier) ---
-embeddings_model = GoogleGenerativeAIEmbeddings(
-    model="models/gemini-embedding-001",
-    google_api_key=settings.gemini_api_key,
-)
+_embeddings_model: GoogleGenerativeAIEmbeddings | None = None
+
+
+def _get_embeddings_model() -> GoogleGenerativeAIEmbeddings:
+    """Lazily build embeddings client so imports work in CI without cloud creds."""
+    global _embeddings_model
+    if _embeddings_model is None:
+        _embeddings_model = GoogleGenerativeAIEmbeddings(
+            model="models/gemini-embedding-001",
+            google_api_key=settings.gemini_api_key,
+        )
+    return _embeddings_model
 
 # --- Text splitter ---
 splitter = RecursiveCharacterTextSplitter(
@@ -78,6 +86,7 @@ async def ingest_document(
     chunks = splitter.split_text(raw_text)
 
     # 4. Embed all chunks in one batch call (saves quota)
+    embeddings_model = _get_embeddings_model()
     chunk_embeddings = await embeddings_model.aembed_documents(chunks)
 
     # 5. Bulk insert into pgvector
