@@ -1,8 +1,7 @@
 services:
   api:
     build: ./backend
-    ports:
-      - "8000:8000"
+    # No host port mapping required for running tests inside Docker
     env_file: .env
     volumes:
       - ./backend:/app   # live reload during development
@@ -19,8 +18,7 @@ services:
       POSTGRES_DB: docusense
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin123
-    ports:
-      - "5432:5432"
+    # No host port mapping required for container-only DB access
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
