@@ -12,7 +12,10 @@ class Settings(BaseSettings):
     secret_key: str = "changeme"
     environment: str = "development"
 
-    model_config = SettingsConfigDict(env_file=".env")
+    model_config = SettingsConfigDict(
+        env_file=(".env", "../.env"),
+        extra="ignore",
+    )
 
 
 settings = Settings()

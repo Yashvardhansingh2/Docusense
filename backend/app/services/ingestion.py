@@ -51,12 +51,17 @@ def _upload_to_supabase(file_bytes: bytes, filename: str, doc_id: str) -> str:
 
 def extract_text(file_bytes: bytes) -> str:
     """Extract all text from a PDF file."""
+    if not file_bytes:
+        raise ValueError("The uploaded PDF file is empty.")
     parts = []
-    with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-        for page in pdf.pages:
-            t = page.extract_text()
-            if t:
-                parts.append(t)
+    try:
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            for page in pdf.pages:
+                t = page.extract_text()
+                if t:
+                    parts.append(t)
+    except Exception as exc:
+        raise ValueError(f"Failed to parse PDF: {exc}") from exc
     return "\n\n".join(parts)
 
 

@@ -4,7 +4,16 @@ import sys
 
 import httpx
 
-PDF_PATH = pathlib.Path('/Users/yash/Downloads/unit1.pdf')
+DEFAULT_PDF = pathlib.Path(__file__).parent / 'test_sample.pdf'
+USER_PDF = pathlib.Path('/Users/yash/Downloads/unit1.pdf')
+
+if len(sys.argv) > 1:
+    PDF_PATH = pathlib.Path(sys.argv[1])
+elif USER_PDF.exists():
+    PDF_PATH = USER_PDF
+else:
+    PDF_PATH = DEFAULT_PDF
+
 BASE_URL = 'http://localhost:8000/api/v1'
 
 
